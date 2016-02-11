@@ -9,6 +9,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import linecache
 import serial
+import sys
 import time
 
 PORT = "COM3"
@@ -20,23 +21,22 @@ GREEN = 0
 BLUE = 0
 
 
-class AThread(QtCore.QThread):
-    # TODO: is it really needed? We can send frames only while changing, INO will hold state
-    def __init__(self):
-        super().__init__()
-        self.ser = serial.Serial()
-        self.ser.port = PORT
-        self.ser.baudrate = BAUDRATE
-        self.ser.bytesize = BYTESIZE
-        # TODO: serial connecting/disconnecting
+def __except__():
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    linecache.checkcache(filename)
+    line = linecache.getline(filename, lineno, f.f_globals)
+    __show_warning__("Error", "Exception in file:\n%s\nLine number: %i\n%s\nException type: %s" %
+                     (filename, lineno, line.strip(), exc_obj))
 
-    def run(self):
-        # TODO: change run function
-        count = 0
-        while count < 5:
-            time.sleep(1)
-            print("Increasing")
-            count += 1
+
+def __show_warning__(title, text):
+    message_box = QtWidgets.QMessageBox()
+    message_box.setWindowTitle(title)
+    message_box.setText(text)
+    message_box.exec_()
 
 
 # noinspection PyAttributeOutsideInit
@@ -125,7 +125,7 @@ class UiLEDController(object):
         self.green_slider.valueChanged.connect(self.change_color)
         self.bright_slider.valueChanged.connect(self.change_color)
         self.red_slider.valueChanged.connect(self.change_color)
-        # self.pick_button.clicked.connect()
+        self.pick_button.released.connect(self.test)
         QtCore.QMetaObject.connectSlotsByName(led_controller)
 
         self.tray = QtWidgets.QSystemTrayIcon(self.central_widget)
@@ -143,23 +143,6 @@ class UiLEDController(object):
         self.mode_box.setItemText(1, _translate("led_controller", "Manual"))
         self.mode_box.setItemText(2, _translate("led_controller", "Automatic"))
         self.blue_label.setText(_translate("led_controller", "Blue"))
-
-    def __except__(self):
-        exc_type, exc_obj, tb = sys.exc_info()
-        f = tb.tb_frame
-        lineno = tb.tb_lineno
-        filename = f.f_code.co_filename
-        linecache.checkcache(filename)
-        line = linecache.getline(filename, lineno, f.f_globals)
-        self.__show_warning__("Error", "Exception in file:\n%s\nLine number: %i\n%s\nException type: %s" %
-                              (filename, lineno, line.strip(), exc_obj))
-
-    @staticmethod
-    def __show_warning__(title, text):
-        message_box = QtWidgets.QMessageBox()
-        message_box.setWindowTitle(title)
-        message_box.setText(text)
-        message_box.exec_()
 
     def connect_ino(self, selected):
         # TODO: clean this function
@@ -181,7 +164,7 @@ class UiLEDController(object):
                 if not self.ser.isOpen():
                     self.ser.open()
         except:
-            self.__except__()
+            __except__()
 
     def change_color(self, _):
         try:
@@ -193,14 +176,8 @@ class UiLEDController(object):
             if self.ser.isOpen():
                 self.ser.write([0xff, red, green, blue])
         except:
-            self.__except__()
+            __except__()
 
+    def test(self):
+        print("test")
 
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    LEDController = QtWidgets.QMainWindow()
-    ui = UiLEDController()
-    ui.setup_ui(LEDController)
-    LEDController.show()
-    sys.exit(app.exec_())
